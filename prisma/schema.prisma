@@ -1,0 +1,88 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  password     String
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  appointmentsAsDoctor    Appointment[] @relation("DoctorAppointments")
+  appointmentsAsFrontDesk Appointment[] @relation("FrontDeskAppointments")
+  auditLogs               AuditLog[]
+}
+
+model Patient {
+  id             String   @id @default(cuid())
+  name           String
+  phone          String
+  medicalHistory String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  appointments   Appointment[]
+}
+
+model Appointment {
+  id           String   @id @default(cuid())
+  patientId    String
+  doctorId     String
+  frontDeskId  String
+  notes        String?
+  price        Float
+  dateTime     DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  doctor       User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  frontDesk    User     @relation("FrontDeskAppointments", fields: [frontDeskId], references: [id])
+  prescription Prescription?
+}
+
+model Prescription {
+  id            String   @id @default(cuid())
+  appointmentId String   @unique
+  drugs         String
+  instructions  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entity     String
+  entityId   String
+  dataBefore String?
+  dataAfter  String?
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  FRONT_DESK
+  DOCTOR
+  PHARMACIST
+}
