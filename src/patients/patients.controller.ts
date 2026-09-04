@@ -15,13 +15,13 @@ export class PatientsController {
     return this.patientsService.create(body);
   }
 
-  @Roles('ADMIN', 'DOCTOR', 'PHARMACIST')
+  @Roles('ADMIN', 'DOCTOR', 'PHARMACIST', 'FRONT_DESK')
   @Get()
   findAll() {
     return this.patientsService.findAll();
   }
 
-  @Roles('ADMIN', 'DOCTOR', 'PHARMACIST')
+  @Roles('ADMIN', 'DOCTOR', 'PHARMACIST', 'FRONT_DESK')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.patientsService.findOne(id);
