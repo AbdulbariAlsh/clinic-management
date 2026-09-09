@@ -1,98 +1,133 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Clinic Management System
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A backend REST API for managing clinic operations, built with NestJS, Prisma, and SQLite. Demonstrates role-based access control, JWT authentication, and automatic audit logging.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tech Stack
 
-## Description
+| Layer | Technology |
+|---|---|
+| Framework | NestJS 11 |
+| Language | TypeScript |
+| ORM | Prisma 7 |
+| Database | SQLite (via better-sqlite3) |
+| Auth | JWT (passport-jwt) |
+| Password Hashing | bcrypt |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Architecture Decisions
 
-## Project setup
+### 1. Soft Delete on Users and Patients
+Users and Patients are never hard deleted — they are deactivated via `isActive: false`. Hard deleting a patient would orphan their appointment and prescription history, breaking referential integrity. Soft delete preserves the full medical record trail.
 
-```bash
-$ npm install
-```
+### 2. Prescription Linked to Appointment, Not Patient
+A prescription is always issued during an appointment. Rather than storing `patientId` and `doctorId` directly on the Prescription, both are reachable through the Appointment FK. This eliminates data duplication and enforces a single source of truth.
 
-## Compile and run the project
+### 3. Audit Logging on Reads of Sensitive Records
+All mutations (CREATE, UPDATE, DELETE) are logged automatically. Additionally, reads on patient records and prescriptions are logged — in a healthcare context, who accessed sensitive data is as important as who changed it.
 
-```bash
-# development
-$ npm run start
+### 4. Doctor-Only Prescription Ownership
+Only Doctors can create or modify prescriptions. Pharmacists can view them for drug interaction checking but cannot alter them. This maintains clear ownership and a clean audit trail.
 
-# watch mode
-$ npm run start:dev
+### 5. 8-Hour JWT Expiration
+Token expiration is tied to a clinic shift length. When the shift ends, the token expires and staff must re-authenticate.
 
-# production mode
-$ npm run start:prod
-```
+### 6. Interceptor-Based Audit Logging
+Audit logging is implemented as a NestJS Interceptor with a custom `@Audit()` decorator. This means zero manual logging calls in any service — the interceptor wraps the route automatically and logs only where the decorator is applied.
 
-## Run tests
+## Roles & Permissions
 
-```bash
-# unit tests
-$ npm run test
+| Operation | Admin | Front Desk | Doctor | Pharmacist |
+|---|---|---|---|---|
+| Manage Users | ✅ | ❌ | ❌ | ❌ |
+| Create/Update Patients | ❌ | ✅ | ❌ | ❌ |
+| View Patients | ✅ | ✅ | ✅ | ✅ |
+| Delete Patients | ✅ | ❌ | ❌ | ❌ |
+| Create/Update Appointments | ❌ | ✅ | ❌ | ❌ |
+| View Appointments | ✅ | ✅ | ✅ | ❌ |
+| Create/Update/Delete Prescriptions | ❌ | ❌ | ✅ | ❌ |
+| View Prescriptions | ✅ | ❌ | ✅ | ✅ |
 
-# e2e tests
-$ npm run test:e2e
+## Getting Started
 
-# test coverage
-$ npm run test:cov
-```
+### Prerequisites
+- Node.js v18+
+- npm
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Installation
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+git clone https://github.com/AbdulbariAlsh/clinic-management.git
+cd clinic-management
+npm install
+npx prisma generate
+npx prisma migrate dev
+npm run seed
+npm run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Environment Variables
+Create a `.env` file in the project root:
+```
+DATABASE_URL="file:./dev.db"
+JWT_SECRET=your_secret_key_here
+```
 
-## Resources
+### Default Admin Account
+```
+Email: admin@clinic.com
+Password: admin123
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+## API Endpoints
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Auth
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| POST | /auth/login | Public | Login and receive JWT token |
 
-## Support
+### Users
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| POST | /users | Admin | Create a new user |
+| GET | /users | Admin | List all users |
+| GET | /users/:id | Admin | Get a user by ID |
+| PATCH | /users/:id | Admin | Update a user |
+| DELETE | /users/:id | Admin | Deactivate a user (soft delete) |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Patients
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| POST | /patients | Front Desk | Register a new patient |
+| GET | /patients | All roles | List all active patients |
+| GET | /patients/:id | All roles | Get patient details (audited) |
+| PATCH | /patients/:id | Front Desk | Update patient info |
+| DELETE | /patients/:id | Admin | Deactivate a patient (soft delete) |
 
-## Stay in touch
+### Appointments
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| POST | /appointments | Front Desk | Book an appointment |
+| GET | /appointments | Admin, Front Desk, Doctor | List all appointments |
+| GET | /appointments/:id | Admin, Front Desk, Doctor | Get appointment details |
+| PATCH | /appointments/:id | Front Desk | Update appointment |
+| DELETE | /appointments/:id | Admin, Front Desk | Cancel appointment |
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Prescriptions
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| POST | /prescriptions | Doctor | Issue a prescription |
+| GET | /prescriptions | Admin, Doctor, Pharmacist | List all prescriptions |
+| GET | /prescriptions/:id | Admin, Doctor, Pharmacist | Get prescription details (audited) |
+| PATCH | /prescriptions/:id | Doctor | Update a prescription |
+| DELETE | /prescriptions/:id | Doctor | Delete a prescription |
 
-## License
+## Audit Log
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Audit logs are written automatically via a NestJS interceptor. No manual logging calls exist in any service.
+
+| Trigger | Action logged |
+|---|---|
+| Any CREATE | Action, entity, after-state JSON snapshot |
+| Any UPDATE | Action, entity, after-state JSON snapshot |
+| Any DELETE | Action, entity, entity ID |
+| GET /patients/:id | READ action logged |
+| GET /prescriptions/:id | READ action logged |
